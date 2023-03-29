@@ -71,6 +71,7 @@ pub fn inline(sess: &Session, module: &mut Module) -> super::Result<()> {
     let mut inliner = Inliner {
         header: module.header.as_mut().unwrap(),
         types_global_values: &mut module.types_global_values,
+        annotations: &mut module.annotations,
         void,
         functions: &functions,
         disallowed_argument_types: &disallowed_argument_types,
@@ -269,6 +270,7 @@ fn args_invalid(function: &Function, call: &Instruction) -> bool {
 struct Inliner<'m, 'map> {
     header: &'m mut ModuleHeader,
     types_global_values: &'m mut Vec<Instruction>,
+    annotations: &'m mut Vec<Instruction>,
     void: Word,
     functions: &'map FunctionMap,
     disallowed_argument_types: &'map FxHashSet<Word>,
@@ -281,6 +283,23 @@ impl Inliner<'_, '_> {
         let result = self.header.bound;
         self.header.bound += 1;
         result
+    }
+
+    ///Applies all rewrite rules to the decorations in the header.
+    fn apply_rewrite_for_decorations(&mut self, rewrite_rules: &FxHashMap<Word, Word>) {
+        //TODO(siebencorgie): dual loop :/ but it works!
+        // NOTE(siebencorgie): We don't care *what* decoration we rewrite atm. AFAIK there is no case where rewriting
+        // the decoration on inline wouldn't be valid.
+        for annotation in self.annotations.iter_mut() {
+            if annotation.class.opcode == Op::Decorate {
+                //There must be a second operand containing a id, check if that's one we need to rewrite
+                if let Some(id) = annotation.operands[0].id_ref_any_mut() {
+                    if let Some(&rewrite) = rewrite_rules.get(id) {
+                        *id = rewrite;
+                    }
+                }
+            }
+        }
     }
 
     fn ptr_ty(&mut self, pointee: Word) -> Word {
@@ -378,6 +397,7 @@ impl Inliner<'_, '_> {
         // fn is inlined multiple times.
         self.add_clone_id_rules(&mut rewrite_rules, &inlined_callee_blocks);
         apply_rewrite_rules(&rewrite_rules, &mut inlined_callee_blocks);
+        self.apply_rewrite_for_decorations(&rewrite_rules);
 
         // Split the block containing the `OpFunctionCall` into pre-call vs post-call.
         let pre_call_block_idx = block_idx;

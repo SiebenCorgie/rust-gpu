@@ -216,6 +216,37 @@ impl<
         }
     }
 
+    /// Sample texels at `coord` from the image using `sampler`. Same as [Image::sample], but assumes that the image
+    /// (`self`) is nonuniformly accessed through a `RuntimeArray`.
+    #[crate::macros::gpu_only]
+    pub fn sample_nonuniform<F>(
+        &self,
+        sampler: Sampler,
+        coord: impl ImageCoordinate<F, DIM, ARRAYED>,
+    ) -> SampledType::Vec4
+    where
+        F: Float,
+    {
+        unsafe {
+            let mut result = Default::default();
+            asm!(
+                "%typeSampledImage = OpTypeSampledImage typeof*{1}",
+                "OpDecorate %image NonUniform",
+                "%image = OpLoad typeof*{1} {1}",
+                "%sampler = OpLoad typeof*{2} {2}",
+                "%coord = OpLoad typeof*{3} {3}",
+                "%sampledImage = OpSampledImage %typeSampledImage %image %sampler",
+                "%result = OpImageSampleImplicitLod typeof*{0} %sampledImage %coord",
+                "OpStore {0} %result",
+                in(reg) &mut result,
+                in(reg) self,
+                in(reg) &sampler,
+                in(reg) &coord
+            );
+            result
+        }
+    }
+
     /// Sample texels at `coord` from the image using `sampler`, after adding the input bias to the
     /// implicit level of detail.
     #[crate::macros::gpu_only]

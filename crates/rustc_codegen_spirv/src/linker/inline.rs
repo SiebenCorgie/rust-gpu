@@ -287,9 +287,8 @@ impl Inliner<'_, '_> {
 
     ///Applies all rewrite rules to the decorations in the header.
     fn apply_rewrite_for_decorations(&mut self, rewrite_rules: &FxHashMap<Word, Word>) {
-        //TODO(siebencorgie): dual loop :/ but it works!
-        // NOTE(siebencorgie): We don't care *what* decoration we rewrite atm. AFAIK there is no case where rewriting
-        // the decoration on inline wouldn't be valid.
+        // NOTE(siebencorgie): We don't care *what* decoration we rewrite atm. AFAIK
+        // there is no case where rewriting the decoration on inline wouldn't be valid.
         for annotation in self.annotations.iter_mut() {
             if annotation.class.opcode == Op::Decorate {
                 //There must be a second operand containing a id, check if that's one we need to rewrite
